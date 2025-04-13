@@ -1,0 +1,8 @@
+# Git과 Vercel에서 제외할 파일 목록
+
+node_modules
+dist
+package-lock.json
+.DS_Store
+.env
+.vscode
