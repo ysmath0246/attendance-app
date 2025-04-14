@@ -21,22 +21,28 @@
 
 
   .card {
-    width: 60px;
-    height: 80px;
+    width: 5.5rem;
+    height: 6.5rem;
     display: flex;
     justify-content: center;
     align-items: center;
+    flex-direction: column;
+    text-align: center;
     font-weight: bold;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     border: 2px solid #ccc;
     border-radius: 0.75rem;
     background-color: white;
     transition: all 0.2s ease-in-out;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
     cursor: pointer;
-    flex-direction: column;
-    text-align: center;
   }
+  
+  .card .time {
+    font-size: 0.85rem; /* ✅ 살짝 작게 */
+    margin-top: 0.3rem;
+  }
+  
   .card:hover {
     background-color: #f3f4f6;
   }

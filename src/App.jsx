@@ -110,15 +110,16 @@ function AttendanceApp() {
                 const animate = animated[student.name]
                 return (
                   <div
-                    key={student.id}
-                    className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
-                    onClick={() => handleCardClick(student)}
-                  >
-                    <p>{student.name}</p>
-                    {isPresent && (
-                      <p className="text-sm mt-1">✅ {attendance[student.name]} 🎉</p>
-                    )}
-                  </div>
+                  key={student.id}
+                  className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
+                  onClick={() => handleCardClick(student)}
+                >
+                  <p>{student.name}</p>
+                  {isPresent && (
+                    <p className="time">✅ {attendance[student.name]} 🎉</p>
+                  )}
+                </div>
+                
                 )
               })}
             </div>
