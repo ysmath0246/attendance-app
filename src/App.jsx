@@ -104,7 +104,7 @@ function AttendanceApp() {
         .map(time => (
           <div key={time} className="mb-10">
             <h2 className="text-xl font-semibold mb-4">{time}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               {groupedByTime[time].map(student => {
                 const isPresent = attendance[student.name]
                 const animate = animated[student.name]
@@ -114,9 +114,9 @@ function AttendanceApp() {
                     className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
                     onClick={() => handleCardClick(student)}
                   >
-                    <p className="text-lg font-bold">{student.name}</p>
+                    <p>{student.name}</p>
                     {isPresent && (
-                      <p className="mt-2 text-sm">✅ {attendance[student.name]} 🎉</p>
+                      <p className="text-sm mt-1">✅ {attendance[student.name]} 🎉</p>
                     )}
                   </div>
                 )
