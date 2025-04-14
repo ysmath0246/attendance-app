@@ -1,67 +1,80 @@
-import React, { useEffect, useState } from "react"
-import { db } from "./firebase"
-import { collection, doc, getDocs, setDoc } from "firebase/firestore"
-import "./index.css"
+// src/App.jsx
+import React, { useEffect, useState } from "react";
+import { db } from "./firebase";
+import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import "./index.css";
 
 function AttendanceApp() {
-  const [students, setStudents] = useState([])
-  const [attendance, setAttendance] = useState({})
-  const [animated, setAnimated] = useState({})
-  const [password, setPassword] = useState("")
-  const [authenticated, setAuthenticated] = useState(false)
-  const [now, setNow] = useState(new Date())
+  const [students, setStudents] = useState([]);
+  const [attendance, setAttendance] = useState({});
+  const [animated, setAnimated] = useState({});
+  const [password, setPassword] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [now, setNow] = useState(new Date());
 
-  const today = new Date()
-  const todayStr = today.toISOString().split("T")[0]
-  const weekdays = ["일", "월", "화", "수", "목", "금", "토"]
-  const todayWeekday = weekdays[today.getDay()]
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const todayWeekday = weekdays[today.getDay()];
 
   useEffect(() => {
     const fetchData = async () => {
-      const querySnapshot = await getDocs(collection(db, "students"))
-      const list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setStudents(list)
-    }
+      const querySnapshot = await getDocs(collection(db, "students"));
+      const list = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setStudents(list);
+    };
 
-    fetchData()
+    fetchData();
 
-    const timer = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleCardClick = async (student) => {
-    const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`)
+    const input = prompt(
+      `${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`
+    );
 
     if (input === student.birth?.slice(-4)) {
-      const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      setAttendance(prev => ({ ...prev, [student.name]: timeStr }))
+      const timeStr = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      setAttendance((prev) => ({ ...prev, [student.name]: timeStr }));
 
-      const docRef = doc(db, "attendance", todayStr)
-      await setDoc(docRef, { [student.name]: timeStr }, { merge: true })
+      const docRef = doc(db, "attendance", todayStr);
+      await setDoc(
+        docRef,
+        { [student.name]: timeStr },
+        { merge: true }
+      );
 
-      setAnimated(prev => ({ ...prev, [student.name]: true }))
+      setAnimated((prev) => ({ ...prev, [student.name]: true }));
       setTimeout(() => {
-        setAnimated(prev => ({ ...prev, [student.name]: false }))
-      }, 1500)
+        setAnimated((prev) => ({ ...prev, [student.name]: false }));
+      }, 1500);
 
-      alert(`${student.name}님 출석 완료!`)
+      alert(`${student.name}님 출석 완료!`);
     } else {
-      alert("생일이 일치하지 않습니다.")
+      alert("생일이 일치하지 않습니다.");
     }
-  }
+  };
 
   const getTimeGroups = () => {
-    const grouped = {}
-    students.forEach(student => {
-      (student.schedules || []).forEach(schedule => {
+    const grouped = {};
+    students.forEach((student) => {
+      (student.schedules || []).forEach((schedule) => {
         if (schedule.day === todayWeekday) {
-          if (!grouped[schedule.time]) grouped[schedule.time] = []
-          grouped[schedule.time].push(student)
+          if (!grouped[schedule.time]) grouped[schedule.time] = [];
+          grouped[schedule.time].push(student);
         }
-      })
-    })
-    return grouped
-  }
+      });
+    });
+    return grouped;
+  };
 
   if (!authenticated) {
     return (
@@ -72,73 +85,90 @@ function AttendanceApp() {
             placeholder="비밀번호 입력"
             className="border p-2 mr-2"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
           />
-          <button onClick={() => {
-            if (password === "1234") setAuthenticated(true)
-            else alert("비밀번호 오류")
-          }} className="bg-blue-500 text-white px-4 py-2 rounded">
+          <button
+            onClick={() => {
+              if (password === "1234") setAuthenticated(true);
+              else alert("비밀번호 오류");
+            }}
+            className="bg-blue-500 text-white px-4 py-2 rounded"
+          >
             로그인
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  const groupedByTime = getTimeGroups()
-  const totalToday = Object.keys(attendance).length
-  const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  const groupedByTime = getTimeGroups();
+  const totalToday = Object.keys(attendance).length;
+  const timeStr = now.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 
   return (
     <div className="p-6 min-h-screen bg-gray-50">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">출석 체크 - {todayWeekday}요일</h1>
+        <h1 className="text-2xl font-bold">
+          출석 체크 - {todayWeekday}요일
+        </h1>
         <p className="text-sm text-gray-600 mt-1">
-          📅 {todayStr} 🕒 {timeStr} / ✅ 출석 인원: <strong>{totalToday}</strong>
+          📅 {todayStr} 🕒 {timeStr} / ✅ 출석 인원:{" "}
+          <strong>{totalToday}</strong>
         </p>
       </div>
 
       {Object.keys(groupedByTime)
         .sort((a, b) => a.localeCompare(b))
-        .map(time => (
+        .map((time) => (
           <div key={time} className="mb-10">
             <h2 className="text-xl font-semibold mb-4">{time}</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full max-w-[1200px] mx-auto">
-              {groupedByTime[time].map(student => {
-                const isPresent = attendance[student.name]
-                const animate = animated[student.name]
+            {/* 가로로 카드 나열: flex 컨테이너 및 overflow-x-auto 적용 */}
+            <div className="flex flex-row gap-4 overflow-x-auto w-full max-w-[1200px] mx-auto">
+              {groupedByTime[time].map((student) => {
+                const isPresent = attendance[student.name];
+                const animate = animated[student.name];
 
-                const timeText = attendance[student.name]
+                const timeText = attendance[student.name];
                 const isLate = (() => {
-                  if (!timeText) return false
-                  const [h, m] = timeText.split(":").map(Number)
-                  const [sh, sm] = time.split(":").map(Number)
-                  const total = h * 60 + m
-                  const start = sh * 60 + sm
-                  return total > start + 15
-                })()
+                  if (!timeText) return false;
+                  const [h, m] = timeText.split(":").map(Number);
+                  const [sh, sm] = time.split(":").map(Number);
+                  const total = h * 60 + m;
+                  const start = sh * 60 + sm;
+                  return total > start + 15;
+                })();
 
                 return (
                   <div
                     key={student.id}
-                    className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
+                    className={`card ${isPresent ? "attended" : ""} ${
+                      animate ? "animated" : ""
+                    }`}
                     onClick={() => handleCardClick(student)}
                   >
                     <p className="name">{student.name}</p>
                     {isPresent && (
                       <>
-                        <p className="time-text">{attendance[student.name]}</p>
-                        <p className="status">✅ {isLate ? "지각" : "출석"}</p>
+                        <p className="time-text">
+                          {attendance[student.name]}
+                        </p>
+                        <p className="status">
+                          ✅ {isLate ? "지각" : "출석"}
+                        </p>
                       </>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
           </div>
         ))}
     </div>
-  )
+  );
 }
 
-export default AttendanceApp
+export default AttendanceApp;
