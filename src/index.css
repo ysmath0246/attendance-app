@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* index.css 파일 가장 아래쪽에 추가 */
+@keyframes ping-fast {
+    0% {
+      transform: scale(1);
+    }
+    25% {
+      transform: scale(1.08);
+    }
+    50% {
+      transform: scale(1);
+    }
+  }
+  .animate-ping-fast {
+    animation: ping-fast 0.6s ease-in-out;
+  }
+  
+
+
+
+  .card {
+    width: 90px;
+    height: 90px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1rem;
+    border: 2px solid #ccc;
+    border-radius: 0.75rem;
+    background-color: white;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .card:hover {
+    background-color: #f3f4f6;
+  }
+  
+  .card.attended {
+    background-color: #16a34a;
+    color: white;
+    border-color: #15803d;
+    transform: scale(1.05);
+  }
+  
+  .card.animated {
+    animation: pop 0.5s ease-in-out;
+  }
+  
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  
+  
