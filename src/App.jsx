@@ -39,7 +39,6 @@ function AttendanceApp() {
       const docRef = doc(db, "attendance", todayStr)
       await setDoc(docRef, { [student.name]: timeStr }, { merge: true })
 
-      // 애니메이션 표시
       setAnimated(prev => ({ ...prev, [student.name]: true }))
       setTimeout(() => {
         setAnimated(prev => ({ ...prev, [student.name]: false }))
@@ -108,18 +107,31 @@ function AttendanceApp() {
               {groupedByTime[time].map(student => {
                 const isPresent = attendance[student.name]
                 const animate = animated[student.name]
+
+                const timeText = attendance[student.name]
+                const isLate = (() => {
+                  if (!timeText) return false
+                  const [h, m] = timeText.split(":").map(Number)
+                  const [sh, sm] = time.split(":").map(Number)
+                  const total = h * 60 + m
+                  const start = sh * 60 + sm
+                  return total > start + 15
+                })()
+
                 return (
                   <div
-                  key={student.id}
-                  className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
-                  onClick={() => handleCardClick(student)}
-                >
-                  <p>{student.name}</p>
-                  {isPresent && (
-                    <p className="time">✅ {attendance[student.name]} 🎉</p>
-                  )}
-                </div>
-                
+                    key={student.id}
+                    className={`card ${isPresent ? "attended" : ""} ${animate ? "animated" : ""}`}
+                    onClick={() => handleCardClick(student)}
+                  >
+                    <p className="name">{student.name}</p>
+                    {isPresent && (
+                      <>
+                        <p className="time-text">{attendance[student.name]}</p>
+                        <p className="status">✅ {isLate ? "지각" : "출석"}</p>
+                      </>
+                    )}
+                  </div>
                 )
               })}
             </div>
