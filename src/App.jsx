@@ -103,7 +103,7 @@ function AttendanceApp() {
         .map(time => (
           <div key={time} className="mb-10">
             <h2 className="text-xl font-semibold mb-4">{time}</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full max-w-[1200px]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full max-w-[1200px] mx-auto">
               {groupedByTime[time].map(student => {
                 const isPresent = attendance[student.name]
                 const animate = animated[student.name]
