@@ -9,7 +9,9 @@ function AttendanceApp() {
   const [attendance, setAttendance] = useState({});
   const [animated, setAnimated] = useState({});
   const [password, setPassword] = useState("");
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(
+    localStorage.getItem("authenticated") === "true"
+  );
   const [now, setNow] = useState(new Date());
 
   const today = new Date();
@@ -56,6 +58,20 @@ function AttendanceApp() {
     }
   };
 
+  const handleLogin = () => {
+    if (password === "1234") {
+      setAuthenticated(true);
+      localStorage.setItem("authenticated", "true");
+    } else {
+      alert("비밀번호 오류");
+    }
+  };
+
+  const handleLogout = () => {
+    setAuthenticated(false);
+    localStorage.removeItem("authenticated");
+  };
+
   const getTimeGroups = () => {
     const grouped = {};
     students.forEach((student) => {
@@ -81,10 +97,7 @@ function AttendanceApp() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
-            onClick={() => {
-              if (password === "1234") setAuthenticated(true);
-              else alert("비밀번호 오류");
-            }}
+            onClick={handleLogin}
             className="bg-blue-500 text-white px-4 py-2 rounded"
           >
             로그인
@@ -103,15 +116,22 @@ function AttendanceApp() {
   });
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50">
-      {/* 상단 타이틀 영역 */}
-      <div className="mb-6 max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800">
-          출석 체크 - {todayWeekday}요일
-        </h1>
-        <p className="text-sm text-gray-600 mt-1">
-          📅 {todayStr} 🕒 {timeStr} / ✅ 출석 인원: <strong>{totalToday}</strong>
-        </p>
+    <div className="bg-gray-100 min-h-screen p-6">
+      <div className="max-w-5xl mx-auto flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 text-gray-700">
+            📌 출석 체크 - {todayWeekday}요일
+          </h1>
+          <div className="text-gray-600">
+            📅 {todayStr} / ⏰ {timeStr} / ✅ 출석 인원: {totalToday}
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="bg-red-400 text-white px-3 py-1 rounded"
+        >
+          로그아웃
+        </button>
       </div>
 
       {Object.keys(groupedByTime)
@@ -119,49 +139,31 @@ function AttendanceApp() {
         .map((time) => (
           <div
             key={time}
-            className="bg-white p-4 mb-8 rounded-md shadow-md max-w-5xl mx-auto"
+            className="max-w-5xl mx-auto mb-6 bg-white p-4 rounded-lg shadow-md"
           >
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
+            <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800">
               {time} 수업
             </h2>
-            {/* 그리드 레이아웃: 기본 3열, md 이상에서는 6열로 */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
               {groupedByTime[time].map((student) => {
                 const isPresent = attendance[student.name];
                 const animate = animated[student.name];
 
-                const timeText = attendance[student.name];
-                const isLate = (() => {
-                  if (!timeText) return false;
-                  const [h, m] = timeText.split(":").map(Number);
-                  const [sh, sm] = time.split(":").map(Number);
-                  const total = h * 60 + m;
-                  const start = sh * 60 + sm;
-                  return total > start + 15;
-                })();
-
                 return (
                   <div
                     key={student.id}
-                    className={`
-                      cursor-pointer 
-                      rounded-md border border-gray-200 p-4 
-                      shadow-sm hover:shadow-md transition-shadow
-                      ${isPresent ? "bg-green-50" : "bg-white"}
-                      ${animate ? "animate-pulse" : ""}
-                    `}
+                    className={`bg-white p-6 rounded-xl shadow-md cursor-pointer transition transform duration-300 hover:scale-105
+                    ${isPresent ? "bg-green-200" : "bg-white hover:bg-gray-50"}
+                    ${animate ? "animate-pulse" : ""}`}
                     onClick={() => handleCardClick(student)}
                   >
-                    <p className="font-bold text-gray-800">{student.name}</p>
+                    <p className="text-lg font-semibold text-center text-gray-700">
+                      {student.name}
+                    </p>
                     {isPresent && (
-                      <>
-                        <p className="text-sm text-gray-600">
-                          {attendance[student.name]}
-                        </p>
-                        <p className="text-sm text-green-700 font-semibold">
-                          ✅ {isLate ? "지각" : "출석"}
-                        </p>
-                      </>
+                      <p className="text-sm text-center text-green-800 mt-2">
+                        ✅ {attendance[student.name]}
+                      </p>
                     )}
                   </div>
                 );
