@@ -34,10 +34,7 @@ function AttendanceApp() {
   }, []);
 
   const handleCardClick = async (student) => {
-    const input = prompt(
-      `${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`
-    );
-
+    const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`);
     if (input === student.birth?.slice(-4)) {
       const timeStr = new Date().toLocaleTimeString([], {
         hour: "2-digit",
@@ -46,11 +43,7 @@ function AttendanceApp() {
       setAttendance((prev) => ({ ...prev, [student.name]: timeStr }));
 
       const docRef = doc(db, "attendance", todayStr);
-      await setDoc(
-        docRef,
-        { [student.name]: timeStr },
-        { merge: true }
-      );
+      await setDoc(docRef, { [student.name]: timeStr }, { merge: true });
 
       setAnimated((prev) => ({ ...prev, [student.name]: true }));
       setTimeout(() => {
@@ -111,23 +104,28 @@ function AttendanceApp() {
 
   return (
     <div className="p-6 min-h-screen bg-gray-50">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">
+      {/* 상단 타이틀 영역 */}
+      <div className="mb-6 max-w-5xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800">
           출석 체크 - {todayWeekday}요일
         </h1>
         <p className="text-sm text-gray-600 mt-1">
-          📅 {todayStr} 🕒 {timeStr} / ✅ 출석 인원:{" "}
-          <strong>{totalToday}</strong>
+          📅 {todayStr} 🕒 {timeStr} / ✅ 출석 인원: <strong>{totalToday}</strong>
         </p>
       </div>
 
       {Object.keys(groupedByTime)
         .sort((a, b) => a.localeCompare(b))
         .map((time) => (
-          <div key={time} className="mb-10">
-            <h2 className="text-xl font-semibold mb-4">{time}</h2>
-            {/* 가로로 카드 나열: flex 컨테이너 및 overflow-x-auto 적용 */}
-            <div className="flex flex-row gap-4 overflow-x-auto w-full max-w-[1200px] mx-auto">
+          <div
+            key={time}
+            className="bg-white p-4 mb-8 rounded-md shadow-md max-w-5xl mx-auto"
+          >
+            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
+              {time} 수업
+            </h2>
+            {/* 그리드 레이아웃: 기본 3열, md 이상에서는 6열로 */}
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
               {groupedByTime[time].map((student) => {
                 const isPresent = attendance[student.name];
                 const animate = animated[student.name];
@@ -145,18 +143,22 @@ function AttendanceApp() {
                 return (
                   <div
                     key={student.id}
-                    className={`card ${isPresent ? "attended" : ""} ${
-                      animate ? "animated" : ""
-                    }`}
+                    className={`
+                      cursor-pointer 
+                      rounded-md border border-gray-200 p-4 
+                      shadow-sm hover:shadow-md transition-shadow
+                      ${isPresent ? "bg-green-50" : "bg-white"}
+                      ${animate ? "animate-pulse" : ""}
+                    `}
                     onClick={() => handleCardClick(student)}
                   >
-                    <p className="name">{student.name}</p>
+                    <p className="font-bold text-gray-800">{student.name}</p>
                     {isPresent && (
                       <>
-                        <p className="time-text">
+                        <p className="text-sm text-gray-600">
                           {attendance[student.name]}
                         </p>
-                        <p className="status">
+                        <p className="text-sm text-green-700 font-semibold">
                           ✅ {isLate ? "지각" : "출석"}
                         </p>
                       </>
