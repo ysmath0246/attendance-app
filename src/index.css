@@ -34,12 +34,22 @@
 .card:hover {
   background-color: #f3f4f6;
 }
+/* 출석 시 녹색 배경 (이미 있으시면 수정할 필요 없음) */
 .card.attended {
   background-color: #16a34a;
   color: white;
   border-color: #15803d;
   transform: scale(1.05);
 }
+
+/* 지각 시 빨간색 배경 */
+.card.tardy {
+  background-color: #ef4444;
+  color: white;
+  border-color: #dc2626;
+  transform: scale(1.05);
+}
+
 .card.animated {
   animation: pop 0.5s ease-in-out;
 }
