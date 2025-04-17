@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "./firebase";
-import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, setDoc } from "firebase/firestore";
 import "./index.css";
 
 function AttendanceApp() {
@@ -13,20 +13,28 @@ function AttendanceApp() {
   );
   const [now, setNow] = useState(new Date());
 
+  // 오늘 날짜 문자열 및 요일
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   const todayWeekday = weekdays[today.getDay()];
 
-  // 학생 목록 불러오기
   useEffect(() => {
     const fetchData = async () => {
+      // 1) 학생 목록 불러오기
       const querySnapshot = await getDocs(collection(db, "students"));
       const list = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setStudents(list);
+
+      // 2) 오늘자 출석 기록 불러오기
+      const attendanceRef = doc(db, "attendance", todayStr);
+      const attendanceSnap = await getDoc(attendanceRef);
+      if (attendanceSnap.exists()) {
+        setAttendance(attendanceSnap.data());
+      }
     };
 
     fetchData();
@@ -34,10 +42,9 @@ function AttendanceApp() {
     // 현재 시간 업데이트
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, []); // todayStr는 컴포넌트 초기 렌더 시 고정값이므로 빈 deps
 
-  // 카드 클릭 핸들러
-  // scheduleTime은 해당 수업 시작 시간(예: "14:00")을 문자열로 전달한다고 가정
+  // 카드 클릭 시 출석 처리
   const handleCardClick = async (student, scheduleTime) => {
     const input = prompt(
       `${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`
@@ -47,13 +54,11 @@ function AttendanceApp() {
       return;
     }
 
-    // 현재 출석 시간을 문자열로 생성
     const timeStr = new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
 
-    // 수업 시작 시간(scheduleTime, 예: "14:00")을 기준으로 Date 객체 생성
     const [hh, mm] = scheduleTime.split(":");
     const scheduleDate = new Date();
     scheduleDate.setHours(parseInt(hh, 10));
@@ -62,33 +67,21 @@ function AttendanceApp() {
 
     const nowDate = new Date();
     const diffInMinutes = (nowDate - scheduleDate) / (1000 * 60);
-
-    // 15분 초과이면 tardy, 아니면 onTime
     const status = diffInMinutes > 15 ? "tardy" : "onTime";
 
-    // attendance 상태에 { time, status }를 저장
+    // state와 Firestore에 저장
     setAttendance((prev) => ({
       ...prev,
-      [student.name]: {
-        time: timeStr,
-        status,
-      },
+      [student.name]: { time: timeStr, status },
     }));
-
-    // Firestore에 기록 (필요 시)
     const docRef = doc(db, "attendance", todayStr);
     await setDoc(
       docRef,
-      {
-        [student.name]: {
-          time: timeStr,
-          status,
-        },
-      },
+      { [student.name]: { time: timeStr, status } },
       { merge: true }
     );
 
-    // 애니메이션 효과
+    // 애니메이션
     setAnimated((prev) => ({ ...prev, [student.name]: true }));
     setTimeout(() => {
       setAnimated((prev) => ({ ...prev, [student.name]: false }));
@@ -101,7 +94,7 @@ function AttendanceApp() {
     );
   };
 
-  // 로그인/로그아웃 처리
+  // 로그인/로그아웃
   const handleLogin = () => {
     if (password === "1234") {
       setAuthenticated(true);
@@ -110,13 +103,12 @@ function AttendanceApp() {
       alert("비밀번호 오류");
     }
   };
-
   const handleLogout = () => {
     setAuthenticated(false);
     localStorage.removeItem("authenticated");
   };
 
-  // 시간대별/요일별 학생 목록 분류
+  // 오늘 요일에 해당하는 시간대별 학생 그룹
   const getTimeGroups = () => {
     const grouped = {};
     students.forEach((student) => {
@@ -162,7 +154,7 @@ function AttendanceApp() {
 
   return (
     <div className="bg-gray-100 min-h-screen p-6">
-      {/* 헤더 영역 */}
+      {/* 헤더 */}
       <div className="max-w-5xl mx-auto flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2 text-gray-700">
@@ -180,7 +172,7 @@ function AttendanceApp() {
         </button>
       </div>
 
-      {/* 수업 시간대별 카드 영역 */}
+      {/* 시간대별 카드 */}
       {Object.keys(groupedByTime)
         .sort((a, b) => a.localeCompare(b))
         .map((time) => (
@@ -191,7 +183,8 @@ function AttendanceApp() {
             <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800">
               {time} 수업
             </h2>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            {/* 한 줄에 6개 카드 */}
+            <div className="grid grid-cols-6 gap-4">
               {groupedByTime[time].map((student) => {
                 const record = attendance[student.name];
                 const isPresent = !!record;
@@ -209,7 +202,6 @@ function AttendanceApp() {
                     <p className="name">{student.name}</p>
                     {isPresent && (
                       <p className="time-text">
-                        {/* 체크 아이콘과 시간(줄바꿈 처리) */}
                         ✅출석
                         <br />
                         {record.time}
