@@ -378,7 +378,7 @@ setStudents((prev) =>
                 type="password"
                 value={pwInput}
                 onChange={(e) => setPwInput(e.target.value)}
-                placeholder="비밀번호 입력 (0668)"
+                placeholder="비밀번호 입력"
                 className="border p-2 w-full"
               />
               <button
