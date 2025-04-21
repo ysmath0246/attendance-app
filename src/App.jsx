@@ -196,7 +196,23 @@ setStudents((prev) =>
       prev.map((s) => (s.id === student.id ? { ...s, points: updated } : s))
     );
   };
-  
+
+  const handleOverrideTardy = async (studentName) => {
+    const record = attendance[studentName];
+    const pw = prompt("지각 상태입니다. 선생님 비밀번호를 입력하세요 (0606):");
+    if (pw === "0606") {
+      const newStatus = { time: record.time, status: "onTime" };
+      await setDoc(
+        doc(db, "attendance", todayStr),
+        { [studentName]: newStatus },
+        { merge: true }
+      );
+      setAttendance(prev => ({ ...prev, [studentName]: newStatus }));
+      alert(`${studentName}님의 출석 상태가 초록으로 변경되었습니다!`);
+    }
+  };
+
+
   const totalPoints = (p) => pointFields.reduce((sum, key) => sum + (p[key] || 0), 0);
 
 
@@ -292,53 +308,61 @@ setStudents((prev) =>
                   {time} 수업
                 </h2>
                 <div className="grid grid-cols-6 gap-4">
-                  {groupedByTime[time].map((student) => {
-                    const record = attendance[student.name];
-                    const isPresent = !!record;
+                {groupedByTime[time].map((student) => {
+  const record    = attendance[student.name];
+  const isPresent = !!record;
+  const animate   = animated[student.name];
 
-// ✅ 지각 상태면 선생님 비밀번호로 출석 상태 변경 허용
-if (isPresent && record.status === "tardy") {
-  const pw = prompt("지각 상태입니다. 선생님 비밀번호를 입력하세요:");
-  if (pw === "0606") {
-    const newStatus = { time: record.time, status: "onTime" };
-    await setDoc(doc(db, "attendance", todayStr), { [student.name]: newStatus }, { merge: true });
-    setAttendance((prev) => ({ ...prev, [student.name]: newStatus }));
-    alert(`${student.name}님의 출석 상태가 초록으로 변경되었습니다!`);
-  }
-}
+  return (
+    <div
+      key={student.id}
+      className={`
+        card
+        ${isPresent
+          ? record.status === "tardy"
+            ? "tardy"
+            : "attended"
+          : ""
+        }
+        ${animate ? "animated" : ""}
+        ${isPresent
+          ? "cursor-not-allowed opacity-80"
+          : "cursor-pointer hover:shadow-lg"
+        }
+      `}
+      onClick={() => {
+        if (!isPresent) {
+          handleCardClick(student, time);
+        } else if (record.status === "tardy") {
+          handleOverrideTardy(student.name);
+        }
+      }}
+    >
+      {/* ─── 카드 내부 콘텐츠 ─── */}
+      {/* 1) 우측 상단: 전체 포인트 */}
+      <p className="text-right text-sm font-semibold text-gray-700 m-0 leading-none">
+        {totalPoints(student.points)}pt
+      </p>
+
+      {/* 2) 학생 이름 */}
+      <p className="name m-0 leading-none mb-1">{student.name}</p>
+
+      {/* 3) 이미 출석했으면 상태·시간 표시 */}
+      {isPresent && (
+        <p className="time-text m-0 leading-none mt-1">
+          {record.status === "tardy" ? "⚠️ 지각" : "✅ 출석"}<br />
+          {record.time}
+        </p>
+      )}
+      {/* ─── 카드 내부 콘텐츠 끝 ─── */}
+    </div>
+  );
+})}
 
 
-                    const animate = animated[student.name];
-                    return (
-                      <div
-                        key={student.id}
-                        className={`card ${
-                          isPresent
-                            ? record.status === "tardy"
-                              ? "tardy"
-                              : "attended"
-                            : ""
-                        } ${animate ? "animated" : ""} ${
-                          isPresent
-                            ? "cursor-not-allowed opacity-80"
-                            : "cursor-pointer hover:shadow-lg"
-                        }`}
-                        onClick={!isPresent ? () => handleCardClick(student, time) : undefined}
-                      >
-                        <p className="text-right text-sm font-semibold text-gray-700 m-0 leading-none">
-  {totalPoints(student.points)}pt
-</p>
 
-                        <p className="name m-0 leading-none mb-1">{student.name}</p>
-                        {isPresent && (
-                          <p className="time-text m-0 leading-none mt-1">
-                            ✅출석<br />
-                            {record.time}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                 
                 </div>
               </div>
             ))}
