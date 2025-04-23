@@ -75,11 +75,13 @@ const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완
 fetchData(); // ✅ 함수 실행
 }, []);
 
-  const handleCardClick = async (student, scheduleTime) => {
-    if (attendance[student.name]) {
-      alert("이미 출석 처리된 학생입니다.");
-      return;
-    }
+const handleCardClick = async (student, scheduleTime) => {
+      const record = attendance[student.name];
+      // onTime 또는 tardy 상태만 차단하고, '미정'은 허용
+     if (record && (record.status === "onTime" || record.status === "tardy")) {
+       alert("이미 출석 처리된 학생입니다.");
+        return;
+      }
     const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`);
     if (input !== student.birth?.slice(-4)) {
       alert("생일이 일치하지 않습니다.");
