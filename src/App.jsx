@@ -310,8 +310,7 @@ setStudents((prev) =>
                 <div className="grid grid-cols-6 gap-4">
                 {groupedByTime[time].map((student) => {
   const record    = attendance[student.name];
-  const isPresent = !!record;
-  const animate   = animated[student.name];
+  const isPresent = record && (record.status === 'onTime' || record.status === 'tardy');  const animate   = animated[student.name];
 
   return (
     <div
