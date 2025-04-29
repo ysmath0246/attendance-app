@@ -13,6 +13,7 @@ import "./index.css";
 function AttendanceApp() {
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState({});
+  const [todayMakeups, setTodayMakeups] = useState([]); // 🔥 보강 표시용
   const [selectedTab, setSelectedTab] = useState("attendance");
   const [pointsAuth, setPointsAuth] = useState(false);
   const [pwInput, setPwInput] = useState("");
@@ -24,6 +25,9 @@ function AttendanceApp() {
   const [now, setNow] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(0); // 🔥 추가: 페이지 번호
 
+
+
+  
 // ✅ 포인트 항목 리스트 선언
 const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완료"];
 
@@ -69,6 +73,10 @@ const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완
       if (attSnap.exists()) {
         setAttendance(attSnap.data());
       }
+      const makeupSnap = await getDocs(collection(db, "makeups"));
+      const allMakeups = makeupSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const todayMakeups = allMakeups.filter(m => m.date === todayStr);
+      setTodayMakeups(todayMakeups);
     };
     
 
