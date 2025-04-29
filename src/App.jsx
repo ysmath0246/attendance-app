@@ -202,7 +202,7 @@ setStudents((prev) =>
   const handleOverrideTardy = async (studentName) => {
     const record = attendance[studentName];
     const pw = prompt("지각 상태입니다. 선생님 비밀번호를 입력하세요");
-    if (pw === "0606") {
+    if (pw === "0301") {
       const newStatus = { time: record.time, status: "onTime" };
       await setDoc(
         doc(db, "attendance", todayStr),
