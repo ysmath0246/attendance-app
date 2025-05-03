@@ -244,7 +244,7 @@ setStudents((prev) =>
   const timeStr = now.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
+    hour12: false,  // ✅ 이 줄 추가
   });
 
   const studentsPerPage = 10;
