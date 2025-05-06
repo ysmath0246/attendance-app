@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { db } from "./firebase";
 import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  setDoc,
-  writeBatch,
-} from "firebase/firestore";
+    collection,
+    doc,
+    getDocs,
+    getDoc,
+    setDoc,
+    writeBatch,
+    updateDoc,
+    increment,
+  } from "firebase/firestore";
 import "./index.css";
 
 function AttendanceApp() {
@@ -195,17 +197,33 @@ setStudents((prev) =>
 
 
 
-
   const adjustPoint = async (student, field, delta) => {
-    const updated = {
-      ...student.points,
-      [field]: Math.max((student.points[field] || 0) + delta, 0),
+      try {
+        // 1) Firebase 에 nested 필드만 원자적 증감
+        await updateDoc(
+         doc(db, "students", student.id),
+          { [`points.${field}`]: increment(delta) }
+        );
+    
+        // 2) 로컬 상태에도 반영
+        setStudents(prev =>
+          prev.map(s =>
+            s.id === student.id
+              ? {
+                  ...s,
+                  points: {
+                    ...s.points,
+                    [field]: Math.max((s.points[field] || 0) + delta, 0),
+                  },
+                }
+              : s
+          )
+        );
+      } catch (error) {
+        console.error("포인트 업데이트 오류:", error);
+        alert("포인트 저장 중 오류가 발생했습니다.");
+      }
     };
-    await setDoc(doc(db, "students", student.id), { points: updated }, { merge: true });
-    setStudents((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, points: updated } : s))
-    );
-  };
 
   const handleOverrideTardy = async (studentName) => {
     const record = attendance[studentName];
