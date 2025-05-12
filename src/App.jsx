@@ -26,7 +26,9 @@ function AttendanceApp() {
   );
   const [now, setNow] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(0); // 🔥 추가: 페이지 번호
-
+// ✅ 1. 상단 useState 추가
+const [luckyWinner, setLuckyWinner] = useState(null);
+const [luckyVisible, setLuckyVisible] = useState(false);
 
 
   
@@ -127,21 +129,63 @@ const handleCardClick = async (student, scheduleTime) => {
       minute: "2-digit",
     });
     const [hh, mm] = scheduleTime.split(":");
-    const sched = new Date();
-    sched.setHours(+hh, +mm, 0);
-    const diffMin = (new Date() - sched) / 60000;
-    const status = diffMin > 15 ? "tardy" : "onTime";
+const sched = new Date();
+sched.setHours(+hh, +mm, 0);
+const now = new Date();
+const diffMin = (now - sched) / 60000;
 
-    await setDoc(
-      doc(db, "attendance", todayStr),
-      { [student.name]: { time: timeStr, status } },
-      { merge: true }
-    );
-    setAttendance((prev) => ({ ...prev, [student.name]: { time: timeStr, status } }));
+let point = 0;
+let status = "onTime";
+let luckyToday = false;
 
-// 출석 자동 적립
-const updated = { ...student.points, 출석: student.points.출석 + 1 };
+if (diffMin > 15) {
+  status = "tardy";
+  point = 0;
+} else if (diffMin >= -15 && diffMin < +10) {
+  point = 1;
+} else if (diffMin >= -10 && diffMin <= 5) {
+  // 🔥 랜덤 2pt 후보
+  const luckyRef = doc(db, "dailyLucky", todayStr);
+  const luckySnap = await getDoc(luckyRef);
+  if (!luckySnap.exists()) {
+    // 오늘의 럭키 1명도 없음 → 이 학생이 당첨자!
+    point = 2;
+    luckyToday = true;
+    await setDoc(luckyRef, { name: student.name, time: timeStr });
+  } else {
+    point = 1; // 다른 학생이 이미 당첨됨
+  }
+}
+
+// ✅ 출석 및 포인트 저장
+await setDoc(doc(db, "attendance", todayStr), {
+  [student.name]: { time: timeStr, status }
+}, { merge: true });
+
+setAttendance(prev => ({ ...prev, [student.name]: { time: timeStr, status } }));
+
+const updated = {
+  ...student.points,
+  출석: (student.points.출석 || 0) + point
+};
+
 await setDoc(doc(db, "students", student.id), { points: updated }, { merge: true });
+setStudents(prev => prev.map(s => (s.id === student.id ? { ...s, points: updated } : s)));
+
+// ✅ 애니메이션 설정
+setAnimated(prev => ({ ...prev, [student.name]: true }));
+setTimeout(() => setAnimated(prev => ({ ...prev, [student.name]: false })), 1500);
+
+// ✅ Lucky 표시
+if (luckyToday) {
+  setLuckyWinner(student.name);
+  setLuckyVisible(true);
+  setTimeout(() => setLuckyVisible(false), 2500);
+  alert(`🎉 Lucky!!! ${student.name}님 2pt 당첨!`);
+} else {
+  alert(`✅ ${student.name}님 출석 완료! (+${point}pt)`);
+}
+
 
 
 
@@ -302,6 +346,21 @@ setStudents((prev) =>
   );
 
   return (
+      <>
+    {luckyVisible && (
+  <div className="fixed top-10 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-white text-2xl font-bold px-6 py-3 rounded shadow-lg z-50 animate-bounce">
+    🎉 Lucky!!! {luckyWinner}님 2pt!
+  </div>
+)}
+{/* ✅ 4. 출석 카드 상단 공지 텍스트 추가 */}
+<div className="flex items-center gap-2 justify-center text-sm text-blue-700 bg-blue-100 px-4 py-2 rounded mb-4">
+  <span>📣</span>
+  <div>
+    <div>생일 4자리 입력시 출석완료!</div>
+    <div> 랜덤 Lucky 2pt는 10분전~5분후까지만! 지각시 0pt</div>
+  </div>
+</div>
+
     <div className="bg-gray-100 min-h-screen p-6">
       <div className="max-w-5xl mx-auto flex space-x-4 mb-6">
         <button
@@ -394,6 +453,10 @@ setStudents((prev) =>
       }}
     >
       {/* ─── 카드 내부 콘텐츠 ─── */}
+      {/* 👑 Lucky 당첨자 왕관 */}
+{record?.status === 'onTime' && student.name === luckyWinner && (
+  <div className="text-3xl text-yellow-500 text-center mb-1">👑</div>
+)}
       {/* 1) 우측 상단: 전체 포인트 */}
       <p className="text-right text-sm font-semibold text-gray-700 m-0 leading-none">
         {totalPoints(student.points)}pt
@@ -576,6 +639,7 @@ setStudents((prev) =>
 
 
         </div>
+        </>
       )}
     
 
