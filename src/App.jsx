@@ -84,6 +84,30 @@ const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완
 
 fetchData(); // ✅ 함수 실행
 }, []);
+const [scheduleChanges, setScheduleChanges] = useState([]);
+
+useEffect(() => {
+  const fetchChanges = async () => {
+    const snap = await getDocs(collection(db, 'schedule_changes'));
+    const changes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setScheduleChanges(changes);
+  };
+  fetchChanges();
+}, []);
+
+
+const getScheduleForDate = (studentId, dateStr) => {
+  const changes = scheduleChanges.filter(c => c.studentId === studentId);
+  const applicable = changes.filter(c => c.effectiveDate <= dateStr);
+  if (applicable.length === 0) {
+    const student = students.find(s => s.id === studentId);
+    return student?.schedules || [];
+  }
+  applicable.sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+  return applicable[0].schedules;
+};
+
+
 
 const handleCardClick = async (student, scheduleTime) => {
       const record = attendance[student.name];
@@ -161,17 +185,21 @@ setStudents((prev) =>
   };
 
   const getTimeGroups = () => {
-    const g = {};
-    students.forEach((s) => {
-      s.schedules?.forEach(({ day, time }) => {
-        if (day === todayWeekday) {
-          if (!g[time]) g[time] = [];
-          g[time].push(s);
-        }
-      });
+  const g = {};
+  const dateStr = today.toISOString().split("T")[0];
+
+  students.forEach((s) => {
+    const schedules = getScheduleForDate(s.id, dateStr);
+    schedules.forEach(({ day, time }) => {
+      if (day === todayWeekday) {
+        if (!g[time]) g[time] = [];
+        g[time].push(s);
+      }
     });
-    return g;
-  };
+  });
+
+  return g;
+};
 
   if (!authenticated) {
     return (
