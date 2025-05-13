@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { db } from "./firebase";
 import {
     collection,
@@ -29,8 +29,23 @@ function AttendanceApp() {
 // ✅ 1. 상단 useState 추가
 const [luckyWinner, setLuckyWinner] = useState(null);
 const [luckyVisible, setLuckyVisible] = useState(false);
+const [highStudents, setHighStudents] = useState([]);
 
 
+  const totalToday = Object.keys(attendance).length;
+  const timeStr = now.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,  // ✅ 이 줄 추가
+  });
+
+  const studentsPerPage = 10;
+  const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
+  const totalPages = Math.ceil(sortedStudents.length / studentsPerPage);
+  const paginatedStudents = sortedStudents.slice(
+    currentPage * studentsPerPage,
+    currentPage * studentsPerPage + studentsPerPage
+  );
   
 // ✅ 포인트 항목 리스트 선언
 const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완료"];
@@ -88,6 +103,8 @@ fetchData(); // ✅ 함수 실행
 }, []);
 const [scheduleChanges, setScheduleChanges] = useState([]);
 
+
+
 useEffect(() => {
   const fetchChanges = async () => {
     const snap = await getDocs(collection(db, 'schedule_changes'));
@@ -95,6 +112,15 @@ useEffect(() => {
     setScheduleChanges(changes);
   };
   fetchChanges();
+}, []);
+
+useEffect(() => {
+  const fetchHigh = async () => {
+    const snap = await getDocs(collection(db, 'students_high'));
+    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setHighStudents(list);
+  };
+  fetchHigh();
 }, []);
 
 
@@ -108,6 +134,51 @@ const getScheduleForDate = (studentId, dateStr) => {
   applicable.sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
   return applicable[0].schedules;
 };
+
+  const getTimeGroups = () => {
+  const g = {};
+  const dateStr = today.toISOString().split("T")[0];
+
+  students.forEach((s) => {
+    if (s.active === false || (s.pauseDate && s.pauseDate <= dateStr)) return;
+    const schedules = getScheduleForDate(s.id, dateStr);
+    schedules.forEach(({ day, time }) => {
+      if (day === todayWeekday) {
+        if (!g[time]) g[time] = [];
+        g[time].push(s);
+      }
+    });
+  });
+
+  return g;
+};
+
+const groupedByTime = useMemo(() => getTimeGroups(), [students, scheduleChanges]);
+
+useEffect(() => {
+  const targetTimes = ["14:00", "15:00", "16:00"];
+  const eligible = [];
+
+  targetTimes.forEach(time => {
+    if (groupedByTime[time]) {
+      groupedByTime[time].forEach(s => {
+        const record = attendance[s.name];
+        if (record?.status === 'onTime') {
+          eligible.push(s);
+        }
+      });
+    }
+  });
+
+  if (eligible.length > 0) {
+    const lucky = eligible[Math.floor(Math.random() * eligible.length)];
+    setLuckyWinner(lucky.name);
+  }
+}, [groupedByTime, attendance]);
+
+
+
+
 
 
 
@@ -228,22 +299,6 @@ setStudents((prev) =>
     localStorage.removeItem("authenticated");
   };
 
-  const getTimeGroups = () => {
-  const g = {};
-  const dateStr = today.toISOString().split("T")[0];
-
-  students.forEach((s) => {
-    const schedules = getScheduleForDate(s.id, dateStr);
-    schedules.forEach(({ day, time }) => {
-      if (day === todayWeekday) {
-        if (!g[time]) g[time] = [];
-        g[time].push(s);
-      }
-    });
-  });
-
-  return g;
-};
 
   if (!authenticated) {
     return (
@@ -324,26 +379,31 @@ setStudents((prev) =>
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
   };
-  
-  
+  const handleHighCardClick = async (student) => {
+  const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`);
+  if (input !== student.birth?.slice(-4)) {
+    alert("생일이 일치하지 않습니다.");
+    return;
+  }
 
-
-
-  const groupedByTime = getTimeGroups();
-  const totalToday = Object.keys(attendance).length;
-  const timeStr = now.toLocaleTimeString([], {
+  const now = new Date();
+  const time = now.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,  // ✅ 이 줄 추가
   });
+  const todayStr = now.toISOString().split("T")[0];
 
-  const studentsPerPage = 10;
-  const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
-  const totalPages = Math.ceil(sortedStudents.length / studentsPerPage);
-  const paginatedStudents = sortedStudents.slice(
-    currentPage * studentsPerPage,
-    currentPage * studentsPerPage + studentsPerPage
-  );
+  await setDoc(doc(db, "high-attendance", todayStr), {
+    [student.name]: { time, status: "출석" }
+  }, { merge: true });
+
+  alert(`✅ ${student.name}님 고등부 출석 완료!`);
+};
+
+  
+
+
+
 
   return (
       <>
@@ -454,8 +514,8 @@ setStudents((prev) =>
     >
       {/* ─── 카드 내부 콘텐츠 ─── */}
       {/* 👑 Lucky 당첨자 왕관 */}
-{record?.status === 'onTime' && student.name === luckyWinner && (
-  <div className="text-3xl text-yellow-500 text-center mb-1">👑</div>
+{student.name === luckyWinner && (
+    <div className="text-3xl text-yellow-500 text-center mb-1">👑</div>
 )}
       {/* 1) 우측 상단: 전체 포인트 */}
       <p className="text-right text-sm font-semibold text-gray-700 m-0 leading-none">
@@ -484,6 +544,23 @@ setStudents((prev) =>
                 </div>
               </div>
             ))}
+
+
+           <div className="max-w-5xl mx-auto mt-8">
+  <h2 className="text-xl font-bold mb-4">🎓 고등부 출석</h2>
+  <div className="grid grid-cols-6 gap-4">
+    {highStudents.map(student => (
+      <div
+        key={student.id}
+        className="card cursor-pointer hover:shadow-lg"
+        onClick={() => handleHighCardClick(student)}
+      >
+        <p className="name m-0 leading-none mb-1">{student.name}</p>
+      </div>
+    ))}
+  </div>
+</div>
+
         </>
       )}
 
