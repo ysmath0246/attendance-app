@@ -30,6 +30,7 @@ function AttendanceApp() {
 const [luckyWinner, setLuckyWinner] = useState(null);
 const [luckyVisible, setLuckyVisible] = useState(false);
 const [highStudents, setHighStudents] = useState([]);
+const [highAttendance, setHighAttendance] = useState({});
 
 
   const totalToday = Object.keys(attendance).length;
@@ -124,6 +125,19 @@ useEffect(() => {
 }, []);
 
 
+useEffect(() => {
+  const fetchHighAttendance = async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const snap = await getDoc(doc(db, "high-attendance", todayStr));
+    if (snap.exists()) {
+      setHighAttendance(snap.data());
+    }
+  };
+  fetchHighAttendance();
+}, []);
+
+
+
 const getScheduleForDate = (studentId, dateStr) => {
   const changes = scheduleChanges.filter(c => c.studentId === studentId);
   const applicable = changes.filter(c => c.effectiveDate <= dateStr);
@@ -154,27 +168,19 @@ const getScheduleForDate = (studentId, dateStr) => {
 };
 
 const groupedByTime = useMemo(() => getTimeGroups(), [students, scheduleChanges]);
-
+// 🔁 Lucky 당첨자 Firebase에서 불러오기
 useEffect(() => {
-  const targetTimes = ["14:00", "15:00", "16:00"];
-  const eligible = [];
-
-  targetTimes.forEach(time => {
-    if (groupedByTime[time]) {
-      groupedByTime[time].forEach(s => {
-        const record = attendance[s.name];
-        if (record?.status === 'onTime') {
-          eligible.push(s);
-        }
-      });
+  const loadLuckyWinner = async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const luckyRef = doc(db, "dailyLucky", todayStr);
+    const luckySnap = await getDoc(luckyRef);
+    if (luckySnap.exists()) {
+      const data = luckySnap.data();
+      setLuckyWinner(data.name);
     }
-  });
-
-  if (eligible.length > 0) {
-    const lucky = eligible[Math.floor(Math.random() * eligible.length)];
-    setLuckyWinner(lucky.name);
-  }
-}, [groupedByTime, attendance]);
+  };
+  loadLuckyWinner();
+}, []);
 
 
 
@@ -183,6 +189,7 @@ useEffect(() => {
 
 
 const handleCardClick = async (student, scheduleTime) => {
+  const todayStr = new Date().toISOString().split("T")[0]; // ✅ 이 줄이 빠졌음!!
       const record = attendance[student.name];
       // onTime 또는 tardy 상태만 차단하고, '미정'은 허용
      if (record && (record.status === "onTime" || record.status === "tardy")) {
@@ -212,21 +219,21 @@ let luckyToday = false;
 if (diffMin > 15) {
   status = "tardy";
   point = 0;
-} else if (diffMin >= -15 && diffMin < +10) {
-  point = 1;
 } else if (diffMin >= -10 && diffMin <= 5) {
-  // 🔥 랜덤 2pt 후보
+  // 🔥 Lucky 후보 시간대
   const luckyRef = doc(db, "dailyLucky", todayStr);
   const luckySnap = await getDoc(luckyRef);
   if (!luckySnap.exists()) {
-    // 오늘의 럭키 1명도 없음 → 이 학생이 당첨자!
     point = 2;
     luckyToday = true;
     await setDoc(luckyRef, { name: student.name, time: timeStr });
   } else {
-    point = 1; // 다른 학생이 이미 당첨됨
+    point = 1;
   }
+} else if (diffMin >= -15 && diffMin < -10) {
+  point = 1;
 }
+
 
 // ✅ 출석 및 포인트 저장
 await setDoc(doc(db, "attendance", todayStr), {
@@ -393,13 +400,18 @@ setStudents((prev) =>
   });
   const todayStr = now.toISOString().split("T")[0];
 
+  
   await setDoc(doc(db, "high-attendance", todayStr), {
     [student.name]: { time, status: "출석" }
   }, { merge: true });
 
+  setHighAttendance(prev => ({
+    ...prev,
+    [student.name]: { time, status: "출석" }
+  }));
+
   alert(`✅ ${student.name}님 고등부 출석 완료!`);
 };
-
   
 
 
@@ -463,6 +475,10 @@ setStudents((prev) =>
               <div className="text-gray-600">
                 📅 {todayStr} / ⏰ {timeStr} / ✅ 출석 인원: {totalToday}
               </div>
+              <div className="text-center text-lg text-yellow-600 font-bold mb-4">
+  🎉 오늘의 Lucky 당첨자: {luckyWinner ? `${luckyWinner}님` : '아직 없음'}
+</div>
+
             </div>
             <button
               onClick={handleLogout}
@@ -549,16 +565,28 @@ setStudents((prev) =>
            <div className="max-w-5xl mx-auto mt-8">
   <h2 className="text-xl font-bold mb-4">🎓 고등부 출석</h2>
   <div className="grid grid-cols-6 gap-4">
-    {highStudents.map(student => (
+  {highStudents.map(student => {
+    const record = highAttendance[student.name];
+    const isPresent = record?.status === "출석";
+
+    return (
       <div
         key={student.id}
-        className="card cursor-pointer hover:shadow-lg"
+        className={`card ${isPresent ? "attended" : ""} cursor-pointer hover:shadow-lg`}
         onClick={() => handleHighCardClick(student)}
       >
         <p className="name m-0 leading-none mb-1">{student.name}</p>
+        {isPresent && (
+          <p className="time-text m-0 leading-none mt-1">
+            ✅ 출석<br />{record.time}
+          </p>
+        )}
       </div>
-    ))}
-  </div>
+    );
+  })}
+</div>
+
+
 </div>
 
         </>
