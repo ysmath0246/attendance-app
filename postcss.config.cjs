@@ -1,7 +1,7 @@
 // postcss.config.cjs
 module.exports = {
   plugins: {
-    '@tailwindcss/postcss': {},  // ✅ 반드시 이 라인으로 변경해야 합니다!
+    tailwindcss: {},       // ✅ 올바른 플러그인 이름
     autoprefixer: {},
   },
 };

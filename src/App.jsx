@@ -11,14 +11,14 @@ import {
     increment,
   } from "firebase/firestore";
 import "./index.css";
+import PointShopTab from "./PointShopTab";
+
 
 function AttendanceApp() {
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState({});
   const [todayMakeups, setTodayMakeups] = useState([]); // 🔥 보강 표시용
   const [selectedTab, setSelectedTab] = useState("attendance");
-  const [pointsAuth, setPointsAuth] = useState(false);
-  const [pwInput, setPwInput] = useState("");
   const [animated, setAnimated] = useState({});
   const [password, setPassword] = useState("");
   const [authenticated, setAuthenticated] = useState(
@@ -276,22 +276,7 @@ setStudents((prev) =>
     alert(`✅ ${student.name}님 출석 완료! (+1pt)`);
   };
 
-  const handleAddPoint = async (student) => {
-    const newP = (student.points || 0) + 1;
-    await setDoc(doc(db, "students", student.id), { points: newP }, { merge: true });
-    setStudents((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, points: newP } : s))
-    );
-  };
-
-  const handleSubtractPoint = async (student) => {
-    const newP = Math.max((student.points || 0) - 1, 0);
-    await setDoc(doc(db, "students", student.id), { points: newP }, { merge: true });
-    setStudents((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, points: newP } : s))
-    );
-  };
-
+  
   const handleLogin = () => {
     if (password === "1234") {
       setAuthenticated(true);
@@ -330,35 +315,7 @@ setStudents((prev) =>
   }
 
 
-
-  const adjustPoint = async (student, field, delta) => {
-      try {
-        // 1) Firebase 에 nested 필드만 원자적 증감
-        await updateDoc(
-         doc(db, "students", student.id),
-          { [`points.${field}`]: increment(delta) }
-        );
     
-        // 2) 로컬 상태에도 반영
-        setStudents(prev =>
-          prev.map(s =>
-            s.id === student.id
-              ? {
-                  ...s,
-                  points: {
-                    ...s.points,
-                    [field]: Math.max((s.points[field] || 0) + delta, 0),
-                  },
-                }
-              : s
-          )
-        );
-      } catch (error) {
-        console.error("포인트 업데이트 오류:", error);
-        alert("포인트 저장 중 오류가 발생했습니다.");
-      }
-    };
-
   const handleOverrideTardy = async (studentName) => {
     const record = attendance[studentName];
     const pw = prompt("지각 상태입니다. 선생님 비밀번호를 입력하세요");
@@ -445,22 +402,23 @@ setStudents((prev) =>
         >
           출석 체크
         </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            selectedTab === "points"
-              ? "bg-blue-500 text-white"
-              : "bg-white text-gray-700"
-          }`}
-          onClick={() => setSelectedTab("points")}
-        >
-          포인트 관리
-        </button>
+       
 
         <button onClick={() => setSelectedTab("ranking")}
     className={`px-4 py-2 rounded ${selectedTab === "ranking" ? "bg-blue-500 text-white" : "bg-white text-gray-700"}`}>
     포인트 랭킹
   </button>
 
+<button
+  className={`px-4 py-2 rounded ${
+    selectedTab === "shop"
+      ? "bg-blue-500 text-white"
+      : "bg-white text-gray-700"
+  }`}
+  onClick={() => setSelectedTab("shop")}
+>
+  포인트상점
+</button>
 
 
       </div>
@@ -533,10 +491,14 @@ setStudents((prev) =>
 {student.name === luckyWinner && (
     <div className="text-3xl text-yellow-500 text-center mb-1">👑</div>
 )}
-      {/* 1) 우측 상단: 전체 포인트 */}
-      <p className="text-right text-sm font-semibold text-gray-700 m-0 leading-none">
-        {totalPoints(student.points)}pt
-      </p>
+      
+{/* 💡 전체 + 가용 포인트 */}
+<div className="text-right text-xs font-semibold text-gray-700 leading-none mb-1">
+  총 {totalPoints(student.points)}pt<br />
+  <span className="text-green-600">가용 {student.availablePoints ?? totalPoints(student.points)}pt</span>
+</div>
+
+
 
       {/* 2) 학생 이름 */}
       <p className="name m-0 leading-none mb-1">{student.name}</p>
@@ -592,98 +554,6 @@ setStudents((prev) =>
         </>
       )}
 
-      {selectedTab === "points" && (
-        <div className="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow-md">
-          {!pointsAuth ? (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">포인트 관리 (비밀번호 필요)</h2>
-              <input
-                type="password"
-                value={pwInput}
-                onChange={(e) => setPwInput(e.target.value)}
-                placeholder="비밀번호 입력"
-                className="border p-2 w-full"
-              />
-              <button
-                onClick={() => {
-                  if (pwInput === "0668") setPointsAuth(true);
-                  else alert("비밀번호가 틀렸습니다.");
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded"
-              >
-                확인
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">전체 포인트 관리</h2>
-              <div className="text-gray-700">
-              총 포인트: {students.reduce((sum, s) => sum + totalPoints(s.points), 0)}pt
-
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-              {paginatedStudents.map((s) => (
-  <div key={s.id} className="bg-white border rounded-xl shadow-sm p-4 mb-4 space-y-2">
-    <div className="flex justify-between items-center">
-      <h2 className="text-lg font-bold">{s.name}</h2>
-      <span className="text-sm text-gray-500">총합: <b>{totalPoints(s.points)}pt</b></span>
-    </div>
-
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-      {pointFields.map((field) => (
-        <div
-          key={field}
-          className="bg-gray-50 border px-2 py-1 rounded flex flex-col text-xs items-center"
-        >
-          <span className="font-medium">{field}</span>
-          <span className="text-sm font-bold text-blue-600">{s.points?.[field] ?? 0}pt</span>
-          <div className="flex space-x-1 mt-1">
-            <button
-              onClick={() => adjustPoint(s, field, 1)}
-              className="px-1 bg-green-500 text-white rounded text-xs"
-            >
-              +1
-            </button>
-            <button
-              onClick={() => adjustPoint(s, field, -1)}
-              className="px-1 bg-red-500 text-white rounded text-xs"
-            >
-              -1
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-))}
-
-
-              </div>
-              <div className="flex justify-center space-x-4 mt-4">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 0))}
-                  disabled={currentPage === 0}
-                  className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
-                >
-                  ◀ 이전
-                </button>
-                <span className="self-center text-sm text-gray-700">
-                  {currentPage + 1} / {totalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(p + 1, totalPages - 1))
-                  }
-                  disabled={currentPage >= totalPages - 1}
-                  className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
-                >
-                  다음 ▶
-                </button>
-              </div>
-            </div>
-          )}</div>
-        )
-      }
 
 
 {selectedTab === "ranking" && (
@@ -741,7 +611,7 @@ setStudents((prev) =>
 )}
 
 
-
+{selectedTab === "shop" && <PointShopTab />}
 
         </div>
         </>
