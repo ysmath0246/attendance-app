@@ -370,7 +370,7 @@ setStudents((prev) =>
       .slice(0, 5);
   };
   const handleHighCardClick = async (student) => {
-  const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`);
+  const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 1225)`);
   if (input !== student.birth?.slice(-4)) {
     alert("생일이 일치하지 않습니다.");
     return;
