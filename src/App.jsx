@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { db } from "./firebase";
 import {
-    collection,
-    doc,
-    getDocs,
-    getDoc,
-    setDoc,
-    writeBatch,
-    updateDoc,
-    increment,
-  } from "firebase/firestore";
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  writeBatch,
+  updateDoc,
+  arrayUnion,
+  increment,
+} from "firebase/firestore";
 import "./index.css";
 import PointShopTab from "./PointShopTab";
 
@@ -196,7 +197,7 @@ const handleCardClick = async (student, scheduleTime) => {
        alert("이미 출석 처리된 학생입니다.");
         return;
       }
-    const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 0412)`);
+    const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 1225)`);
     if (input !== student.birth?.slice(-4)) {
       alert("생일이 일치하지 않습니다.");
       return;
@@ -215,24 +216,49 @@ const diffMin = (now - sched) / 60000;
 let point = 0;
 let status = "onTime";
 let luckyToday = false;
+const EXCLUDE_NAMES = ["김은우", "조예린"];
 
 if (diffMin > 15) {
   status = "tardy";
   point = 0;
-} else if (diffMin >= -10 && diffMin <= 5) {
-  // 🔥 Lucky 후보 시간대
-  const luckyRef = doc(db, "dailyLucky", todayStr);
-  const luckySnap = await getDoc(luckyRef);
-  if (!luckySnap.exists()) {
-    point = 2;
-    luckyToday = true;
-    await setDoc(luckyRef, { name: student.name, time: timeStr });
-  } else {
+ } else if (diffMin >= -10 && diffMin <= 5) {
+    // 1) 제외 대상이 아니면 후보자에 추가
+    if (!EXCLUDE_NAMES.includes(student.name)) {
+      const luckyRef = doc(db, "dailyLucky", todayStr);
+      try {
+        await updateDoc(luckyRef, {
+          candidates: arrayUnion(student.name)
+        });
+      } catch {
+        await setDoc(luckyRef, { candidates: [student.name] });
+      }
+    }
+
+    // 2) 체크인 윈도우가 끝난 뒤(수업시간+5분) 랜덤 추첨
+    const nowMs = Date.now();
+    const windowEnd = sched.getTime() + 5 * 60000;
+    const snapAfter = await getDoc(luckyRef);
+    const data = snapAfter.data() || {};
+    if (!data.name && nowMs > windowEnd) {
+      // ② 제거된 이름 제외하고 다시 필터링
+      const list = (data.candidates || []).filter(n => !EXCLUDE_NAMES.includes(n));
+      if (list.length > 0) {
+        const winner = list[Math.floor(Math.random() * list.length)];
+        await updateDoc(luckyRef, { name: winner, time: timeStr });
+        data.name = winner;
+      }
+    }
+
+    // 3) 포인트 부여 (추첨된 사람이면 2pt, 아니면 1pt)
+    if (data.name === student.name) {
+      point = 2;
+      luckyToday = true;
+    } else {
+      point = 1;
+    }
+  } else if (diffMin >= -15 && diffMin < -10) {
     point = 1;
   }
-} else if (diffMin >= -15 && diffMin < -10) {
-  point = 1;
-}
 
 
 // ✅ 출석 및 포인트 저장
