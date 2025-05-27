@@ -261,21 +261,35 @@ if (diffMin > 15) {
   }
 
 
-// ✅ 출석 및 포인트 저장
-await setDoc(doc(db, "attendance", todayStr), {
-  [student.name]: { time: timeStr, status }
-}, { merge: true });
+ // ✅ 1) 출석 기록 저장
+    await setDoc(doc(db, "attendance", todayStr), {
+      [student.name]: { time: timeStr, status }
+    }, { merge: true });
+    setAttendance(prev => ({ ...prev, [student.name]: { time: timeStr, status } }));
 
-setAttendance(prev => ({ ...prev, [student.name]: { time: timeStr, status } }));
+    // ✅ 2) 총포인트, 가용포인트 계산
+    const updated = {
+      ...student.points,
+      출석: (student.points.출석 || 0) + point
+    };
+    const prevAvailable = student.availablePoints ?? Object.values(student.points).reduce((a,b)=>a+b, 0);
+    const updatedAvailable = prevAvailable + point;
 
-const updated = {
-  ...student.points,
-  출석: (student.points.출석 || 0) + point
-};
+    // ✅ 3) Firestore 에도 가용포인트 함께 저장
+    await setDoc(
+      doc(db, "students", student.id),
+      { points: updated, availablePoints: updatedAvailable },
+      { merge: true }
+    );
 
-await setDoc(doc(db, "students", student.id), { points: updated }, { merge: true });
-setStudents(prev => prev.map(s => (s.id === student.id ? { ...s, points: updated } : s)));
-
+    // ✅ 4) 로컬 상태에도 반영
+    setStudents(prev =>
+      prev.map(s =>
+        s.id === student.id
+          ? { ...s, points: updated, availablePoints: updatedAvailable }
+          : s
+      )
+    );
 // ✅ 애니메이션 설정
 setAnimated(prev => ({ ...prev, [student.name]: true }));
 setTimeout(() => setAnimated(prev => ({ ...prev, [student.name]: false })), 1500);
