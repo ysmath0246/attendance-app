@@ -237,18 +237,15 @@ if (diffMin > 15) {
     // 2) 체크인 윈도우가 끝난 뒤(수업시간+5분) 랜덤 추첨
     const nowMs = Date.now();
     const windowEnd = sched.getTime() + 5 * 60000;
-    const snapAfter = await getDoc(luckyRef);
-    const data = snapAfter.data() || {};
-    if (!data.name && nowMs > windowEnd) {
-      // ② 제거된 이름 제외하고 다시 필터링
-      const list = (data.candidates || []).filter(n => !EXCLUDE_NAMES.includes(n));
-      if (list.length > 0) {
-        const winner = list[Math.floor(Math.random() * list.length)];
-        await updateDoc(luckyRef, { name: winner, time: timeStr });
-        data.name = winner;
-      }
-    }
-
+     const snapAfter = await getDoc(luckyRef);
+        const data = snapAfter.data() || {};
++        // 수업시간+5분 후에 후보자가 2명 이상일 때만 추첨 실행
+        const candidatesList = (data.candidates || []).filter(n => !EXCLUDE_NAMES.includes(n));
+        if (!data.name && nowMs > windowEnd && candidatesList.length > 1) {
+          const winner = candidatesList[Math.floor(Math.random() * candidatesList.length)];
+          await updateDoc(luckyRef, { name: winner, time: timeStr });
+          data.name = winner;
+        }
     // 3) 포인트 부여 (추첨된 사람이면 2pt, 아니면 1pt)
     if (data.name === student.name) {
       point = 2;
@@ -307,14 +304,14 @@ if (luckyToday) {
 
 
 
-setStudents((prev) =>
-  prev.map((s) => (s.id === student.id ? { ...s, points: updated } : s))
-);
+//setStudents((prev) =>
+ // prev.map((s) => (s.id === student.id ? { ...s, points: updated } : s))
+//);
 
-    setAnimated((prev) => ({ ...prev, [student.name]: true }));
-    setTimeout(() => setAnimated((prev) => ({ ...prev, [student.name]: false })), 1500);
-    alert(`✅ ${student.name}님 출석 완료! (+1pt)`);
-  };
+  //  setAnimated((prev) => ({ ...prev, [student.name]: true }));
+   // setTimeout(() => setAnimated((prev) => ({ ...prev, [student.name]: false })), 1500);
+ //   alert(`✅ ${student.name}님 출석 완료! (+1pt)`);
+//};
 
   
   const handleLogin = () => {
@@ -375,14 +372,28 @@ setStudents((prev) =>
   const totalPoints = (p) => pointFields.reduce((sum, key) => sum + (p[key] || 0), 0);
 
 
+// 동점자 처리: 상위 5개 점수별로 names 배열을 반환
+const getTopRankings = (field) => {
+  const list = students.map((s) => ({
+    name: s.name,
+    value: s.points?.[field] || 0
+  }));
+  // 점수 기준 내림차순, 중복 제거 후 상위 5개 점수만 추출
+  const topValues = [...new Set(list.map((i) => i.value))]
+    .sort((a, b) => b - a)
+    .slice(0, 5);
+  // 각 점수별 동점자 목록 생성
+  return topValues.map((value) => ({
+    value,
+    names: list
+     .filter((i) => i.value === value)
+      .map((i) => i.name)
+  }));
+};
 
-  const getTopRankings = (field) => {
-    if (!Array.isArray(students) || students.length === 0) return []; // ✅ 추가
-    return [...students]
-      .map((s) => ({ name: s.name, value: s.points?.[field] || 0 }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  };
+
+
+
   const handleHighCardClick = async (student) => {
   const input = prompt(`${student.name} 생일 뒷 4자리를 입력하세요 (예: 1225)`);
   if (input !== student.birth?.slice(-4)) {
@@ -600,53 +611,63 @@ setStudents((prev) =>
   <div className="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow-md">
     <h2 className="text-xl font-semibold mb-4">🏆 포인트 랭킹 (실시간)</h2>
 
-    {/* 항목별 TOP 5 카드 */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      {pointFields.map((field) => {
-        const top5 = getTopRankings(field);
-        return (
-          <div key={field} className="bg-gray-50 p-4 border rounded shadow">
-            <h4 className="font-bold text-center mb-2">{field} TOP 5</h4>
-            <ol className="text-sm space-y-1">
-              {[...Array(5)].map((_, i) => (
-                <li key={i}>
-                  {i + 1}등{" "}
-                  {top5[i] ? (
-                    <>
-                      <b>{top5[i].name}</b> ({top5[i].value}pt)
-                    </>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </li>
-              ))}
-            </ol>
+   {/* 항목별 TOP 5 카드 (동점자 옆으로 나열) */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    {pointFields.map((field) => {
+      const rankings = getTopRankings(field);
+      return (
+        <div key={field} className="bg-gray-50 p-4 border rounded shadow">
+          <h4 className="font-bold text-center mb-2">{field} TOP 5</h4>
+          <div className="space-y-2 text-sm">
+            {rankings.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex justify-center items-center"
+              >
+                <span className="font-semibold mr-1">{idx + 1}등</span>
+                {item.names.map((name) => (
+                  <span key={name} className="mx-1">{name}</span>
+                ))}
+                <span className="ml-1">({item.value}pt)</span>
+              </div>
+            ))}
           </div>
-        );
-      })}
-    </div>
+        </div>
+      );
+    })}
+  </div>
 
     {/* 총합 TOP 5 */}
     <h3 className="text-lg font-bold mt-8 mb-2">💯 총합 TOP 5</h3>
-    <ol className="text-sm space-y-1">
-      {[...Array(5)].map((_, i) => {
-        const sorted = [...students]
-          .map((s) => ({ name: s.name, total: totalPoints(s.points) }))
-          .sort((a, b) => b.total - a.total);
-        return (
-          <li key={i}>
-            {i + 1}등{" "}
-            {sorted[i] ? (
-              <>
-                <b>{sorted[i].name}</b> ({sorted[i].total}pt)
-              </>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="space-y-2 text-sm">
+    {(() => {
+      const totalList = students.map((s) => ({
+        name: s.name,
+        value: totalPoints(s.points)
+      }));
+      const totalValues = [...new Set(totalList.map((i) => i.value))]
+        .sort((a, b) => b - a)
+        .slice(0, 5);
+      const totalRankings = totalValues.map((value) => ({
+        value,
+        names: totalList
+          .filter((i) => i.value === value)
+          .map((i) => i.name)
+      }));
+      return totalRankings.map((item, idx) => (
+        <div
+          key={idx}
+          className="flex justify-center items-center"
+        >
+          <span className="font-semibold mr-1">{idx + 1}등</span>
+          {item.names.map((name) => (
+            <span key={name} className="mx-1">{name}</span>
+          ))}
+          <span className="ml-1">({item.value}pt)</span>
+        </div>
+      ));
+    })()}
+  </div>
   </div>
 )}
 
