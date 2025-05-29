@@ -54,7 +54,8 @@ const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완
 
 
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+// ➕ 로컬 시간(KST) 기준 YYYY-MM-DD
+  const todayStr = new Date().toLocaleDateString("en-CA");  // "2025-05-29" 형태
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   const todayWeekday = weekdays[today.getDay()];
 
@@ -84,16 +85,26 @@ const pointFields = ["출석", "숙제", "수업태도", "시험", "문제집완
             }
           });
         }
+   // ➕ 초기 가용포인트 설정
+      const initAvail = Object.values(s.points).reduce((a, b) => a + b, 0);
+      batch.set(
+        doc(db, "students", s.id),
+        { availablePoints: initAvail },
+        { merge: true }
+      );
+      s.availablePoints = initAvail;
+
+
       });
       await batch.commit();
       setStudents(list);
     
-      // ✅ 출석 정보도 함께 불러오기
-      const attRef = doc(db, "attendance", todayStr);
-      const attSnap = await getDoc(attRef);
-      if (attSnap.exists()) {
-        setAttendance(attSnap.data());
-      }
+      // 🚨 오늘 출석 초기화 (이전 테스트 기록 제거)
+      // ➕ 오늘 출석 문서를 완전 덮어쓴 뒤, 다시 읽어와서 빈 상태로 초기화
+    const attRef = doc(db, "attendance", todayStr);
+    await setDoc(attRef, {}, { merge: false });
+    const attSnap = await getDoc(attRef);
+    setAttendance(attSnap.exists() ? attSnap.data() : {});
       const makeupSnap = await getDocs(collection(db, "makeups"));
       const allMakeups = makeupSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const todayMakeups = allMakeups.filter(m => m.date === todayStr);
@@ -216,44 +227,37 @@ const diffMin = (now - sched) / 60000;
 let point = 0;
 let status = "onTime";
 let luckyToday = false;
-const EXCLUDE_NAMES = ["김은우", "조예린"];
+//const EXCLUDE_NAMES = ["김은우", "조예린"];
 
 if (diffMin > 15) {
   status = "tardy";
   point = 0;
  } else if (diffMin >= -10 && diffMin <= 5) {
-    // 1) 제외 대상이 아니면 후보자에 추가
-    if (!EXCLUDE_NAMES.includes(student.name)) {
-      const luckyRef = doc(db, "dailyLucky", todayStr);
-      try {
-        await updateDoc(luckyRef, {
-          candidates: arrayUnion(student.name)
-        });
-      } catch {
-        await setDoc(luckyRef, { candidates: [student.name] });
-      }
-    }
-
-    // 2) 체크인 윈도우가 끝난 뒤(수업시간+5분) 랜덤 추첨
+   // 기본 출석 포인트 1점
+    point = 1;
+    // 지정된 시간 창(수업시간-10분 ~ +5분) 안에서
+    // 사전 선정된 후보자에게만 Lucky 2pt 부여
     const nowMs = Date.now();
-    const windowEnd = sched.getTime() + 5 * 60000;
-     const snapAfter = await getDoc(luckyRef);
-        const data = snapAfter.data() || {};
-+        // 수업시간+5분 후에 후보자가 2명 이상일 때만 추첨 실행
-        const candidatesList = (data.candidates || []).filter(n => !EXCLUDE_NAMES.includes(n));
-        if (!data.name && nowMs > windowEnd && candidatesList.length > 1) {
-          const winner = candidatesList[Math.floor(Math.random() * candidatesList.length)];
-          await updateDoc(luckyRef, { name: winner, time: timeStr });
-          data.name = winner;
-        }
-    // 3) 포인트 부여 (추첨된 사람이면 2pt, 아니면 1pt)
-    if (data.name === student.name) {
+    const windowStart = sched.getTime() - 10 * 60000;
+    const windowEnd   = sched.getTime() +  5 * 60000;
+    if (
+      !dailyLucky?.winnerId &&
+      student.id === dailyLucky?.candidateId &&
+      nowMs >= windowStart &&
+      nowMs <= windowEnd
+    ) {
+      // 2pt 부여 및 Winner 업데이트
       point = 2;
       luckyToday = true;
-    } else {
-      point = 1;
+      const luckyRef = doc(db, "dailyLucky", todayStr);
+      await updateDoc(luckyRef, {
+        winnerId: student.id,
+        time: timeStr
+      });
+      setLuckyWinner(student.name);
     }
-  } else if (diffMin >= -15 && diffMin < -10) {
+  }
+ else if (diffMin >= -15 && diffMin < -10) {
     point = 1;
   }
 
@@ -263,30 +267,33 @@ if (diffMin > 15) {
       [student.name]: { time: timeStr, status }
     }, { merge: true });
     setAttendance(prev => ({ ...prev, [student.name]: { time: timeStr, status } }));
+ // ➕ 2) 총포인트 + 가용포인트 함께 계산
+  const updated = {
+    ...student.points,
+    출석: (student.points.출석 || 0) + point
+  };
+  const prevAvailable = typeof student.availablePoints === 'number'
+    ? student.availablePoints
+    : Object.values(student.points).reduce((a, b) => a + b, 0);
+  const updatedAvailable = prevAvailable + point;
 
-    // ✅ 2) 총포인트, 가용포인트 계산
-    const updated = {
-      ...student.points,
-      출석: (student.points.출석 || 0) + point
-    };
-    const prevAvailable = student.availablePoints ?? Object.values(student.points).reduce((a,b)=>a+b, 0);
-    const updatedAvailable = prevAvailable + point;
+  // ➕ 3) Firestore 에 총/가용포인트 동시 업데이트
+  await updateDoc(
+    doc(db, "students", student.id),
+    {
+      points: updated,
+      availablePoints: updatedAvailable
+    }
+  );
 
-    // ✅ 3) Firestore 에도 가용포인트 함께 저장
-    await setDoc(
-      doc(db, "students", student.id),
-      { points: updated, availablePoints: updatedAvailable },
-      { merge: true }
-    );
-
-    // ✅ 4) 로컬 상태에도 반영
-    setStudents(prev =>
-      prev.map(s =>
-        s.id === student.id
-          ? { ...s, points: updated, availablePoints: updatedAvailable }
-          : s
-      )
-    );
+  // ➕ 4) 로컬 상태에도 즉시 반영
+  setStudents(prev =>
+    prev.map(s =>
+      s.id === student.id
+        ? { ...s, points: updated, availablePoints: updatedAvailable }
+        : s
+    )
+  );
 // ✅ 애니메이션 설정
 setAnimated(prev => ({ ...prev, [student.name]: true }));
 setTimeout(() => setAnimated(prev => ({ ...prev, [student.name]: false })), 1500);
