@@ -17,6 +17,10 @@ export default function PointShopTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [authCode, setAuthCode] = useState("");
   const [verifiedStudent, setVerifiedStudent] = useState(null);
+const [deleteTargetLog, setDeleteTargetLog] = useState(null);
+const [deletePassword, setDeletePassword] = useState("");
+const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
 
   useEffect(() => {
     const unsubItems = onSnapshot(collection(db, "point_shop"), (snap) =>
@@ -80,22 +84,30 @@ export default function PointShopTab() {
   setTimeout(() => setVerifiedStudent(null), 5000);
 };
 
+const handleDeleteLog = (log) => {
+  setDeleteTargetLog(log);
+  setDeletePassword("");
+  setDeleteModalOpen(true);
+};
 
-  const handleDeleteLog = async (log) => {
-    const pw = prompt("관리자 비밀번호를 입력하세요");
-    if (pw !== "ys0246") return alert("비밀번호가 틀립니다.");
-    const student = students.find((s) => s.id === log.studentId);
-    if (!student) return;
-    await deleteDoc(doc(db, "point_logs", log.id));
-    await setDoc(
-      doc(db, "students", student.id),
-      {
-        availablePoints:
-          (student.availablePoints || 0) + log.point,
-      },
-      { merge: true }
-    );
-  };
+const confirmDeleteLog = async () => {
+  if (deletePassword !== "ys0246") {
+    alert("비밀번호가 틀렸습니다.");
+    return;
+  }
+  const student = students.find((s) => s.id === deleteTargetLog.studentId);
+  if (!student) return;
+  await deleteDoc(doc(db, "point_logs", deleteTargetLog.id));
+  await setDoc(
+    doc(db, "students", student.id),
+    {
+      availablePoints: (student.availablePoints || 0) + deleteTargetLog.point,
+    },
+    { merge: true }
+  );
+  setDeleteModalOpen(false);
+};
+
 
   return (
     <div className="flex">
@@ -114,14 +126,11 @@ export default function PointShopTab() {
         )}
 
         <div className="grid grid-cols-2 gap-4">
-          {items.map((item) => (
+          {[...items]
+  .sort((a, b) => a.point - b.point)
+  .map((item) => (
             <div key={item.id} className="text-center relative">
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className="w-full h-32 object-cover rounded shadow"
-              />
-              <div className="text-sm font-semibold mt-1">{item.name}</div>
+             <div className="text-sm font-semibold mt-1">{item.name}</div>
               <div className="text-xs text-gray-500 mb-2">
                 {item.point}pt
               </div>
@@ -232,6 +241,34 @@ export default function PointShopTab() {
   </>
 )}
 
+{deleteModalOpen && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white p-6 rounded shadow-lg w-80 text-center">
+      <h3 className="text-lg font-semibold mb-4">🧾 사용 내역 삭제</h3>
+      <input
+        type="password"
+        placeholder="관리자 비밀번호"
+        value={deletePassword}
+        onChange={(e) => setDeletePassword(e.target.value)}
+        className="w-full border p-2 rounded mb-4"
+      />
+      <div className="flex justify-between gap-2">
+        <button
+          onClick={() => setDeleteModalOpen(false)}
+          className="bg-gray-300 px-4 py-2 rounded w-1/2"
+        >
+          취소
+        </button>
+        <button
+          onClick={confirmDeleteLog}
+          className="bg-red-600 text-white px-4 py-2 rounded w-1/2"
+        >
+          삭제
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
   );
